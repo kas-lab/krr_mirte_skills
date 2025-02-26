@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import rclpy
 from rclpy.node import Node
 
 from krr_mirte_skills_msgs.srv import GetObjectInfo
+from gazebo_msgs.srv import GetModelProperties
 
 class GetObjectInfoNode(Node):
   def __init__(self):
@@ -24,20 +24,42 @@ class GetObjectInfoNode(Node):
       GetObjectInfo,
       'get_object_info',
       self.get_object_info_cb)
+    self.cli_get = self.create_client(
+      GetModelProperties,
+      'get_model_properties', 
+      callback_group=rclpy.callback_groups.MutuallyExclusiveCallbackGroup())
 
   def get_object_info_cb(self, req, res):
-    # TODO: something to check which object the robot is holding
+    model_req = GetModelProperties.Request()
+    model_req.model_name = "mirte"
+    response = self.call_service(self.cli_get, model_req)
     
-    name = "obj_3_spoon"
-    res.object_type = name.split('_')[2]
+    object_name = next((b for b in response.body_names if b.startswith("obj_")), None)
+    if object_name is None or len(object_name.split('_')) < 3 :
+      res.success = False
+      return res
+    
+    res.object_type = object_name.split('_')[2]
     res.success = True
     return res
-  
+
+  def call_service(self, cli, request):
+    if cli.wait_for_service(timeout_sec=5.0) is False:
+      self.get_logger().error(
+          'service not available {}'.format(cli.srv_name))
+      return None
+    future = cli.call_async(request)
+    self.executor.spin_until_future_complete(future, timeout_sec=5.0)
+    if future.done() is False:
+      self.get_logger().error(
+          'Future not completed {}'.format(cli.srv_name))
+      return None
+    return future.result()
+
 def main(args=None):
   rclpy.init(args=args)
 
   get_object_info_server = GetObjectInfoNode()
-
   rclpy.spin(get_object_info_server)
 
 
