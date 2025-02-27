@@ -17,6 +17,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DropLocation.msg"
   "srv/GetObjectsInRoom.srv"
   "srv/GetDropLocations.srv"
+  "srv/PickObject.srv"
   DEPENDENCIES geometry_msgs
 )
 

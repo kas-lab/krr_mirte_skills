@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'get_objects = krr_mirte_skills.get_objects_node:main'
+            'get_objects = krr_mirte_skills.get_objects_node:main',
+            'pick_place = krr_mirte_skills.pick_place_node:main',
         ],
     },
 )
