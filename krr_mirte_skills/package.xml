@@ -13,7 +13,9 @@
   <test_depend>python3-pytest</test_depend>
 
   <depend>gazebo_msgs</depend>
+  <depend>boeing_gazebo_model_attachment_plugin</depend>
   <depend>krr_mirte_skills_msgs</depend>
+  
   <export>
     <build_type>ament_python</build_type>
   </export>
