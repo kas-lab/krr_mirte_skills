@@ -36,7 +36,7 @@ class GetObjectInfoNode(Node):
         response = self.call_service(self.cli_get, model_req)
 
         object_name = next(
-            (b for b in response.body_names if b.startswith("obj_")), None)
+            (b for b in response.child_model_names if b.startswith("obj_")), None)
         if object_name is None or len(object_name.split('_')) < 3:
             res.success = False
             return res
