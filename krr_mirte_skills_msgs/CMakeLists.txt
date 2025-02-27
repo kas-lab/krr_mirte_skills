@@ -14,8 +14,9 @@ find_package(geometry_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/DropLocation.msg"
   "srv/GetObjectsInRoom.srv"
-
+  "srv/GetDropLocations.srv"
   DEPENDENCIES geometry_msgs
 )
 

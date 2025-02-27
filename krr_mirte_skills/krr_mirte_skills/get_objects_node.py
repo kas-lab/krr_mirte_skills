@@ -1,7 +1,8 @@
 import sys
 
 from gazebo_msgs.srv import GetModelList, GetEntityState
-from krr_mirte_skills_msgs.srv import GetObjectsInRoom
+from krr_mirte_skills_msgs.msg import DropLocation
+from krr_mirte_skills_msgs.srv import GetDropLocations, GetObjectsInRoom
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
@@ -37,7 +38,7 @@ def is_entity_in_room(entity_state, corners):
 
 class GetObjectsInRoomNode(Node):
 
-
+    DROP_ENTITY_PREFIX = "drop_"
     GRABABLE_ENTITY_PREFIX = "obj_"
     ROBOT_ENTITY_NAME = "mirte"
     rooms = {
@@ -50,6 +51,7 @@ class GetObjectsInRoomNode(Node):
     def __init__(self):
         super().__init__('get_objects_in_room_node')
         self.srv = self.create_service(GetObjectsInRoom, 'get_objects_in_room', self.get_objects_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.srv_drop = self.create_service(GetDropLocations, 'get_drop_locations', self.get_drop_locations_callback, callback_group=MutuallyExclusiveCallbackGroup())
         self.get_model_cli = self.create_client(GetModelList, 'get_model_list', callback_group=MutuallyExclusiveCallbackGroup())
         self.get_entity_cli = self.create_client(GetEntityState, 'get_entity_state', callback_group=MutuallyExclusiveCallbackGroup())
         self.ent_req = GetEntityState.Request()
@@ -121,6 +123,24 @@ class GetObjectsInRoomNode(Node):
 
         return response
 
+    def get_drop_locations_callback(self, _, response):
+        
+        entity_names = self.send_request_async(self.get_model_cli,GetModelList.Request()).model_names
+        drop_entities = [entity_name for entity_name in entity_names if entity_name.startswith(self.DROP_ENTITY_PREFIX)]
+        
+        # drop_locations_pose = []
+        for entity_name in drop_entities:
+            self.ent_req.name = entity_name
+            obj_ent_state = self.send_request_async(self.get_entity_cli,self.ent_req)
+            
+            drop_location = DropLocation()
+            drop_location.drop_pose = obj_ent_state.state.pose
+            print(entity_name.split('_')[2])
+            drop_location.type.data = entity_name.split('_')[2]
+            response.drop_locations.append(drop_location)
+        
+        response.success = True
+        return response
 
 def main(args=None):
     rclpy.init(args=args)
