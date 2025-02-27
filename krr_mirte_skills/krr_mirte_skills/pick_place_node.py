@@ -9,18 +9,34 @@ class PickAndPlaceService(Node):
     def __init__(self):
         super().__init__('pick_service')
 
-        self.srv = self.create_service(PickObject, 'pick_object', self.pick_callback)
-        self.place_srv = self.create_service(PlaceObject, 'place_object', self.place_callback)
+        self.srv = self.create_service(
+            PickObject, 
+            'pick_object', 
+            self.pick_callback,
+            callback_group=MutuallyExclusiveCallbackGroup())
+        
+        self.place_srv = self.create_service(
+            PlaceObject, 
+            'place_object', 
+            self.place_callback,
+            callback_group=MutuallyExclusiveCallbackGroup())
 
         self.attached_object = None  
 
         # Gazebo services
-        self.attach_client = self.create_client(Attach, '/gazebo/attach', callback_group=MutuallyExclusiveCallbackGroup())   
-        self.detach_client = self.create_client(Detach, '/gazebo/detach', callback_group=MutuallyExclusiveCallbackGroup())   
+        self.attach_client = self.create_client(
+            Attach, 
+            '/gazebo/attach', 
+            callback_group=MutuallyExclusiveCallbackGroup())   
+        self.detach_client = self.create_client(
+            Detach, 
+            '/gazebo/detach', 
+            callback_group=MutuallyExclusiveCallbackGroup())   
         
-        self.get_entity_cli = self.create_client(GetEntityState, 'get_entity_state', callback_group=MutuallyExclusiveCallbackGroup())
-    
-
+        self.get_entity_cli = self.create_client(
+            GetEntityState, 
+            'get_entity_state', 
+            callback_group=MutuallyExclusiveCallbackGroup())
 
         self.robot_name = "mirte"  
         self.pick_range = 0.5  # Maximum allowed pick distance
@@ -109,10 +125,11 @@ class PickAndPlaceService(Node):
         request = GetEntityState.Request()
         request.name = entity_name
 
-        future = self.get_entity_cli.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
+        # future = self.get_entity_cli.call_async(request)
+        # rclpy.spin_until_future_complete(self, future)
+        result = self.call_service(self.get_entity_cli, request)
 
-        result = future.result()
+        # result = future.result()
         if result is None or not result.success:
             self.get_logger().error(f"Failed to get state of {entity_name}")
             return None
@@ -134,15 +151,12 @@ class PickAndPlaceService(Node):
         request.model_name_2 = object_id
         request.link_name_2 = "link"
 
-        future = self.attach_client.call_async(request)
-        while rclpy.spin_until_future_complete(self, future):
-            self.get_logger().info("Waiting for future to complete")
-        if future.result() is not None:
+        result = self.call_service(self.attach_client, request)
+        if result is not None:
             self.get_logger().info(f"Attached {object_id} to gripper!")
             return True
-        else:
-            self.get_logger().error(f"Failed to attach {object_id}")
-            return False
+        self.get_logger().error(f"Failed to attach {object_id}")
+        return False
         
     def detach_object_from_gripper(self, object_id):
         """ Calls Gazebo's detach service to release the object from the gripper """
@@ -153,33 +167,47 @@ class PickAndPlaceService(Node):
         request.joint_name = "test_joint"
         request.model_name_1 = self.robot_name
         request.model_name_2 = object_id
-        future = self.detach_client.call_async(request)
-        while rclpy.spin_until_future_complete(self, future):
-            self.get_logger().info("Waiting for future to complete")
-        if future.result() is not None:
+        # future = self.detach_client.call_async(request)
+        result = self.call_service(self.detach_client, request)
+        # while rclpy.spin_until_future_complete(self, future):
+        #     self.get_logger().info("Waiting for future to complete")
+        # if future.result() is not None:
+        if result is not None:
             self.get_logger().info(f"Detached {object_id} from gripper!")
             return True
-        else:
-            self.get_logger().error(f"Failed to detach {object_id}")
-            return False
+        self.get_logger().error(f"Failed to detach {object_id}")
+        return False
+    
+    def call_service(self, cli, request):
+        if cli.wait_for_service(timeout_sec=5.0) is False:
+            self.get_logger().error(
+                'service not available {}'.format(cli.srv_name))
+            return None
+        future = cli.call_async(request)
+        self.executor.spin_until_future_complete(future, timeout_sec=5.0)
+        if future.done() is False:
+            self.get_logger().error(
+                'Future not completed {}'.format(cli.srv_name))
+            return None
+        return future.result()
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = PickAndPlaceService()
-    # rclpy.spin(node)
-    # rclpy.shutdown()
-    executor = rclpy.executors.MultiThreadedExecutor()
-    executor.add_node(node)
-    try:
-        executor.spin()
-    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
-        pass
-    except Exception as exception:
-        traceback_logger.error(traceback.format_exc())
-        raise exception
-    finally:
-        node.destroy_node()
+    rclpy.spin(node)
+    rclpy.shutdown()
+    # executor = rclpy.executors.MultiThreadedExecutor()
+    # executor.add_node(node)
+    # try:
+    #     executor.spin()
+    # except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+    #     pass
+    # except Exception as exception:
+    #     # traceback_logger.error(traceback.format_exc())
+    #     raise exception
+    # finally:
+    #     node.destroy_node()
 
 
 if __name__ == '__main__':
