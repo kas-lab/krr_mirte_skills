@@ -1,3 +1,16 @@
+# Copyright 2025 KAS-Lab
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
@@ -125,11 +138,8 @@ class PickAndPlaceService(Node):
         request = GetEntityState.Request()
         request.name = entity_name
 
-        # future = self.get_entity_cli.call_async(request)
-        # rclpy.spin_until_future_complete(self, future)
         result = self.call_service(self.get_entity_cli, request)
 
-        # result = future.result()
         if result is None or not result.success:
             self.get_logger().error(f"Failed to get state of {entity_name}")
             return None
@@ -167,11 +177,8 @@ class PickAndPlaceService(Node):
         request.joint_name = "test_joint"
         request.model_name_1 = self.robot_name
         request.model_name_2 = object_id
-        # future = self.detach_client.call_async(request)
+        
         result = self.call_service(self.detach_client, request)
-        # while rclpy.spin_until_future_complete(self, future):
-        #     self.get_logger().info("Waiting for future to complete")
-        # if future.result() is not None:
         if result is not None:
             self.get_logger().info(f"Detached {object_id} from gripper!")
             return True
@@ -197,18 +204,6 @@ def main(args=None):
     node = PickAndPlaceService()
     rclpy.spin(node)
     rclpy.shutdown()
-    # executor = rclpy.executors.MultiThreadedExecutor()
-    # executor.add_node(node)
-    # try:
-    #     executor.spin()
-    # except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
-    #     pass
-    # except Exception as exception:
-    #     # traceback_logger.error(traceback.format_exc())
-    #     raise exception
-    # finally:
-    #     node.destroy_node()
-
 
 if __name__ == '__main__':
     main()
