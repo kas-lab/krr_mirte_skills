@@ -56,6 +56,13 @@ class PickAndPlaceService(Node):
 
     def pick_callback(self, request, response):
         object_id = request.object_id
+        # if not starting with obj_ then don't pick up
+        if not object_id.startswith("obj_"):
+            self.get_logger().info(f"Invalid object ID: {object_id}")
+            response.success = False
+            response.error= f"Invalid object ID: {object_id}"
+            return response
+
         # Check if the gripper is already holding an object
         if self.attached_object is not None:
             self.get_logger().info(f"Gripper is already holding {self.attached_object}!")
