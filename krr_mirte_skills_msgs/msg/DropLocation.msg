@@ -1,0 +1,2 @@
+geometry_msgs/Pose drop_pose
+std_msgs/String type

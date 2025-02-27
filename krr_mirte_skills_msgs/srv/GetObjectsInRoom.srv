@@ -1,0 +1,5 @@
+# Request
+---
+# Result
+geometry_msgs/Pose[] object_poses
+bool success
