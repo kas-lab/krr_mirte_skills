@@ -17,51 +17,54 @@ from rclpy.node import Node
 from krr_mirte_skills_msgs.srv import GetObjectInfo
 from gazebo_msgs.srv import GetModelProperties
 
+
 class GetObjectInfoNode(Node):
-  def __init__(self):
-    super().__init__('get_object_info_service')
-    self.srv = self.create_service(
-      GetObjectInfo,
-      'get_object_info',
-      self.get_object_info_cb)
-    self.cli_get = self.create_client(
-      GetModelProperties,
-      'get_model_properties', 
-      callback_group=rclpy.callback_groups.MutuallyExclusiveCallbackGroup())
+    def __init__(self):
+        super().__init__('get_object_info_service')
+        self.srv = self.create_service(
+            GetObjectInfo,
+            'get_object_info',
+            self.get_object_info_cb)
+        self.cli_get = self.create_client(
+            GetModelProperties,
+            'get_model_properties',
+            callback_group=rclpy.callback_groups.MutuallyExclusiveCallbackGroup())
 
-  def get_object_info_cb(self, req, res):
-    model_req = GetModelProperties.Request()
-    model_req.model_name = "mirte"
-    response = self.call_service(self.cli_get, model_req)
-    
-    object_name = next((b for b in response.body_names if b.startswith("obj_")), None)
-    if object_name is None or len(object_name.split('_')) < 3 :
-      res.success = False
-      return res
-    
-    res.object_type = object_name.split('_')[2]
-    res.success = True
-    return res
+    def get_object_info_cb(self, req, res):
+        model_req = GetModelProperties.Request()
+        model_req.model_name = "mirte"
+        response = self.call_service(self.cli_get, model_req)
 
-  def call_service(self, cli, request):
-    if cli.wait_for_service(timeout_sec=5.0) is False:
-      self.get_logger().error(
-          'service not available {}'.format(cli.srv_name))
-      return None
-    future = cli.call_async(request)
-    self.executor.spin_until_future_complete(future, timeout_sec=5.0)
-    if future.done() is False:
-      self.get_logger().error(
-          'Future not completed {}'.format(cli.srv_name))
-      return None
-    return future.result()
+        object_name = next(
+            (b for b in response.body_names if b.startswith("obj_")), None)
+        if object_name is None or len(object_name.split('_')) < 3:
+            res.success = False
+            return res
+
+        res.object_type = object_name.split('_')[2]
+        res.success = True
+        return res
+
+    def call_service(self, cli, request):
+        if cli.wait_for_service(timeout_sec=5.0) is False:
+            self.get_logger().error(
+                'service not available {}'.format(cli.srv_name))
+            return None
+        future = cli.call_async(request)
+        self.executor.spin_until_future_complete(future, timeout_sec=5.0)
+        if future.done() is False:
+            self.get_logger().error(
+                'Future not completed {}'.format(cli.srv_name))
+            return None
+        return future.result()
+
 
 def main(args=None):
-  rclpy.init(args=args)
+    rclpy.init(args=args)
 
-  get_object_info_server = GetObjectInfoNode()
-  rclpy.spin(get_object_info_server)
+    get_object_info_server = GetObjectInfoNode()
+    rclpy.spin(get_object_info_server)
 
 
 if __name__ == '__main__':
-  main()
+    main()
