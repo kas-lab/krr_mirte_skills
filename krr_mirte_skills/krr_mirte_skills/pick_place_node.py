@@ -19,7 +19,7 @@ class PickService(Node):
         self.get_entity_list_cli = self.create_client(GetObjectsInRoom, 'get_objects_in_room', callback_group=MutuallyExclusiveCallbackGroup())
 
 
-        self.robot_name = "my_robot"  
+        self.robot_name = "mirte"  
         self.pick_range = 0.5  # Maximum allowed pick distance
 
     def pick_callback(self, request, response):
