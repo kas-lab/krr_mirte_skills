@@ -56,6 +56,13 @@ class PickAndPlaceService(Node):
 
     def pick_callback(self, request, response):
         object_id = request.object_id
+        # if not starting with obj_ then don't pick up
+        if not object_id.startswith("obj_"):
+            self.get_logger().info(f"Invalid object ID: {object_id}")
+            response.success = False
+            response.error= f"Invalid object ID: {object_id}"
+            return response
+
         # Check if the gripper is already holding an object
         if self.attached_object is not None:
             self.get_logger().info(f"Gripper is already holding {self.attached_object}!")
@@ -64,29 +71,23 @@ class PickAndPlaceService(Node):
             return response
 
         # Get the object's pose from Gazebo
-        obj_pose = self.get_object_pose(object_id)
+        obj_pose = self.get_object_pose(object_id, self.robot_name)
         if obj_pose is None:
             self.get_logger().info(f"Object {object_id} not found in Gazebo!")
             response.success = False
             response.error = "Failed: Object not found"
             return response
 
-        # Get the robot's pose from Gazebo
-        robot_pose = self.get_object_pose(self.robot_name)
-        if robot_pose is None:
-            self.get_logger().error("Failed to get robot's position!")
-            response.success = False
-            response.error = "Failed: Could not retrieve robot pose"
-            return response
-
+        robot_pose = (0, 0, 0)
         # Compute distance between the robot and the object
         obj_x, obj_y, obj_z = obj_pose
         robot_x, robot_y, robot_z = robot_pose
-        distance = ((obj_x - robot_x) ** 2 + (obj_y - robot_y) ** 2 + (obj_z - robot_z) ** 2) ** 0.5
-        if distance > self.pick_range:
-            self.get_logger().info(f"Object {object_id} is too far ({distance:.2f}m)!")
+        distance = ((obj_x - robot_x) ** 2 + (obj_y - robot_y) ** 2 ) ** 0.5
+        if distance > self.pick_range or obj_x < -0.1:
+            log_msg = f"Object {object_id} is behind the robot by ({distance:.2f}m)!" if obj_x < -0.1 else f"Object {object_id} is too far ({distance:.2f}m)!"
+            self.get_logger().info(log_msg)
             response.success = False
-            response.error = "Failed: Object out of range"
+            response.error = log_msg
             return response
 
         # Attach object in Gazebo
@@ -129,7 +130,7 @@ class PickAndPlaceService(Node):
         return response
 
     
-    def get_object_pose(self, entity_name):
+    def get_object_pose(self, entity_name, reference_frame = ''):
         """ Calls Gazebo's get_entity_state service to get an entity's position """
         if not self.get_entity_cli.wait_for_service(timeout_sec=2.0):
             self.get_logger().error("Gazebo get_entity_state service unavailable!")
@@ -137,7 +138,7 @@ class PickAndPlaceService(Node):
 
         request = GetEntityState.Request()
         request.name = entity_name
-
+        request.reference_frame = reference_frame
         result = self.call_service(self.get_entity_cli, request)
 
         if result is None or not result.success:
