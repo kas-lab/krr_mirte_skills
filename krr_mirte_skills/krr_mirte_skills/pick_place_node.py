@@ -84,9 +84,10 @@ class PickAndPlaceService(Node):
         robot_x, robot_y, robot_z = robot_pose
         distance = ((obj_x - robot_x) ** 2 + (obj_y - robot_y) ** 2 ) ** 0.5
         if distance > self.pick_range or obj_x < -0.1:
-            self.get_logger().info(f"Object {object_id} is too far ({distance:.2f}m)!")
+            log_msg = f"Object {object_id} is behind the robot by ({distance:.2f}m)!" if obj_x < -0.1 else f"Object {object_id} is too far ({distance:.2f}m)!"
+            self.get_logger().info(log_msg)
             response.success = False
-            response.error = "Failed: Object out of range"
+            response.error = log_msg
             return response
 
         # Attach object in Gazebo
