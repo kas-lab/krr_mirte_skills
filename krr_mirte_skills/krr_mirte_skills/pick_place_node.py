@@ -14,148 +14,174 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
-from krr_mirte_skills_msgs.srv import PickObject, PlaceObject
-from gazebo_msgs.srv import GetEntityState
+from krr_mirte_skills_msgs.srv import PickObject, PlaceObject, GetObjectsInRoom
+from gazebo_msgs.srv import GetEntityState, GetModelList
 from boeing_gazebo_model_attachment_plugin_msgs.srv import Attach, Detach
+
 
 class PickAndPlaceService(Node):
     def __init__(self):
         super().__init__('pick_service')
 
-        self.srv = self.create_service(
-            PickObject, 
-            'pick_object', 
+        self.pick_srv = self.create_service(
+            PickObject,
+            'pick_object',
             self.pick_callback,
             callback_group=MutuallyExclusiveCallbackGroup())
-        
+
         self.place_srv = self.create_service(
-            PlaceObject, 
-            'place_object', 
+            PlaceObject,
+            'place_object',
             self.place_callback,
             callback_group=MutuallyExclusiveCallbackGroup())
 
-        self.attached_object = None  
-
-        # Gazebo services
-        self.attach_client = self.create_client(
-            Attach, 
-            '/gazebo/attach', 
-            callback_group=MutuallyExclusiveCallbackGroup())   
-        self.detach_client = self.create_client(
-            Detach, 
-            '/gazebo/detach', 
-            callback_group=MutuallyExclusiveCallbackGroup())   
-        
-        self.get_entity_cli = self.create_client(
-            GetEntityState, 
-            'get_entity_state', 
+        self.get_objects_cli = self.create_client(
+            GetObjectsInRoom,
+            'get_objects_in_room',
             callback_group=MutuallyExclusiveCallbackGroup())
 
-        self.robot_name = "mirte"  
-        self.pick_range = 0.5  # Maximum allowed pick distance
+        self.get_model_cli = self.create_client(
+            GetModelList,
+            'get_model_list',
+            callback_group=MutuallyExclusiveCallbackGroup())
+
+        self.get_entity_cli = self.create_client(
+            GetEntityState,
+            'get_entity_state',
+            callback_group=MutuallyExclusiveCallbackGroup())
+
+        self.attach_client = self.create_client(
+            Attach,
+            '/gazebo/attach',
+            callback_group=MutuallyExclusiveCallbackGroup())
+        self.detach_client = self.create_client(
+            Detach,
+            '/gazebo/detach',
+            callback_group=MutuallyExclusiveCallbackGroup())
+
+        self.robot_name = "mirte"
+        self.pick_range = 0.5
+        self.attached_object = None
 
     def pick_callback(self, request, response):
-        object_id = request.object_id
-        # if not starting with obj_ then don't pick up
-        if not object_id.startswith("obj_"):
-            self.get_logger().info(f"Invalid object ID: {object_id}")
-            response.success = False
-            response.error= f"Invalid object ID: {object_id}"
-            return response
-
-        # Check if the gripper is already holding an object
         if self.attached_object is not None:
-            self.get_logger().info(f"Gripper is already holding {self.attached_object}!")
+            self.get_logger().info(f"Already holding {self.attached_object}")
             response.success = False
-            response.error= f"Failed: Already holding {self.attached_object}"
+            response.error = f"Already holding {self.attached_object}"
             return response
 
-        # Get the object's pose from Gazebo
-        obj_pose = self.get_object_pose(object_id, self.robot_name)
-        if obj_pose is None:
-            self.get_logger().info(f"Object {object_id} not found in Gazebo!")
+        robot_pose = self.get_robot_pose()
+        if robot_pose is None:
             response.success = False
-            response.error = "Failed: Object not found"
+            response.error = "Failed: Could not retrieve robot pose"
             return response
 
-        robot_pose = (0, 0, 0)
-        # Compute distance between the robot and the object
-        obj_x, obj_y, obj_z = obj_pose
-        robot_x, robot_y, robot_z = robot_pose
-        distance = ((obj_x - robot_x) ** 2 + (obj_y - robot_y) ** 2 ) ** 0.5
-        if distance > self.pick_range or obj_x < -0.1:
-            log_msg = f"Object {object_id} is behind the robot by ({distance:.2f}m)!" if obj_x < -0.1 else f"Object {object_id} is too far ({distance:.2f}m)!"
-            self.get_logger().info(log_msg)
+        object_poses = self.get_objects_in_room()
+        if object_poses is None:
             response.success = False
-            response.error = log_msg
+            response.error = "Failed: Could not get objects from room"
             return response
 
-        # Attach object in Gazebo
-        if self.attach_object_to_gripper(object_id):
-            self.attached_object = object_id
-            response.success = True
-            response.error = f"Success: Picked {object_id}"
-        else:
+        model_list = self.get_model_list()
+        if model_list is None:
             response.success = False
-            response.error = "Failed: Could not attach object"
+            response.error = "Failed: Could not retrieve model list"
+            return response
+
+        picked = False
+
+        for obj_pose in object_poses:
+            obj_x, obj_y = obj_pose.position.x, obj_pose.position.y
+            distance = ((obj_x - robot_pose[0])**2 + (obj_y - robot_pose[1])**2)**0.5
+            # if distance > self.pick_range or obj_x < -0.1:
+            #     log_msg = f"Object {object_id} is behind the robot by ({distance:.2f}m)!" if obj_x < -0.1 else f"Object {object_id} is too far ({distance:.2f}m)!"
+            #     self.get_logger().info(log_msg)
+            #     response.success = False
+            #     response.error = log_msg
+            #     return response
+            
+            
+            if distance <= self.pick_range and obj_x >= -0.1:
+                matched_object = self.match_pose_with_model(obj_pose, model_list)
+                if matched_object and self.attach_object_to_gripper(matched_object):
+                    self.attached_object = matched_object
+                    response.success = True
+                    response.error = f"Picked object {matched_object}"
+                    picked = True
+                    break
+
+        if not picked:
+            response.success = False
+            response.error = "No suitable object within pick range"
 
         return response
 
+    def get_robot_pose(self):
+        if not self.get_entity_cli.wait_for_service(timeout_sec=2.0):
+            self.get_logger().error("GetEntityState service unavailable!")
+            return None
+
+        request = GetEntityState.Request()
+        request.name = self.robot_name
+
+        future = self.get_entity_cli.call_async(request)
+        self.executor.spin_until_future_complete(future, timeout_sec=5.0)
+
+        if future.done() and future.result().success:
+            pose = future.result().state.pose.position
+            return (pose.x, pose.y)
+        else:
+            self.get_logger().error("Failed to retrieve robot pose")
+            return None
+
+    def get_objects_in_room(self):
+        if not self.get_objects_cli.wait_for_service(timeout_sec=2.0):
+            self.get_logger().error("GetObjectsInRoom service unavailable!")
+            return None
+
+        future = self.get_objects_cli.call_async(GetObjectsInRoom.Request())
+        self.executor.spin_until_future_complete(future, timeout_sec=5.0)
+
+        if future.done() and future.result().success:
+            return future.result().object_poses
+        else:
+            self.get_logger().error("Failed to retrieve objects from room")
+            return None
+
+    def get_model_list(self):
+        if not self.get_model_cli.wait_for_service(timeout_sec=2.0):
+            self.get_logger().error("GetModelList service unavailable!")
+            return None
+
+        future = self.get_model_cli.call_async(GetModelList.Request())
+        self.executor.spin_until_future_complete(future, timeout_sec=5.0)
+
+        return future.result().model_names if future.done() else None
+
+    def match_pose_with_model(self, obj_pose, model_list):
+        for model_name in model_list:
+            if model_name.startswith("obj_"):
+                return model_name  # Simplified match
+        return None
+
     def place_callback(self, request, response):
-        """ Handles the place service request """
         if self.attached_object is None:
-            self.get_logger().info("No object is currently held, cannot place.")
             response.success = False
-            response.error = "Failed: No object to place"
+            response.error = "No object to place"
             return response
 
-        # Get robot's pose to determine where to place the object
-        # robot_pose = self.get_object_pose(self.robot_name)
-        # if robot_pose is None:
-        #     self.get_logger().error("Failed to get robot's position!")
-        #     response.success = False
-        #     response.error = "Failed: Could not retrieve robot pose"
-        #     return response
-
-        # Detach object in Gazebo to simulate placing it
         if self.detach_object_from_gripper(self.attached_object):
-            self.get_logger().info(f"Successfully placed {self.attached_object}!")
             response.success = True
             response.error = ""
-            self.attached_object = None  # clear the held obj
+            self.attached_object = None
         else:
             response.success = False
             response.error = "Failed: Could not detach object"
 
         return response
 
-    
-    def get_object_pose(self, entity_name, reference_frame = ''):
-        """ Calls Gazebo's get_entity_state service to get an entity's position """
-        if not self.get_entity_cli.wait_for_service(timeout_sec=2.0):
-            self.get_logger().error("Gazebo get_entity_state service unavailable!")
-            return None
-
-        request = GetEntityState.Request()
-        request.name = entity_name
-        request.reference_frame = reference_frame
-        result = self.call_service(self.get_entity_cli, request)
-
-        if result is None or not result.success:
-            self.get_logger().error(f"Failed to get state of {entity_name}")
-            return None
-
-        return (result.state.pose.position.x, result.state.pose.position.y, result.state.pose.position.z)
-    
-    
     def attach_object_to_gripper(self, object_id):
-        """ Calls Gazebo's attach service to attach the object to the gripper """
-        if not self.attach_client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().error("Gazebo attach service unavailable!")
-            return False
-
         request = Attach.Request()
-        # todo: these needs to specify dynamically later
         request.joint_name = "test_joint"
         request.model_name_1 = self.robot_name
         request.link_name_1 = "Gripper"
@@ -163,41 +189,21 @@ class PickAndPlaceService(Node):
         request.link_name_2 = "link"
 
         result = self.call_service(self.attach_client, request)
-        if result is not None:
-            self.get_logger().info(f"Attached {object_id} to gripper!")
-            return True
-        self.get_logger().error(f"Failed to attach {object_id}")
-        return False
-        
+        return result is not None
+
     def detach_object_from_gripper(self, object_id):
-        """ Calls Gazebo's detach service to release the object from the gripper """
-        if not self.detach_client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().error("Gazebo detach service unavailable!")
-            return False
         request = Detach.Request()
         request.joint_name = "test_joint"
         request.model_name_1 = self.robot_name
         request.model_name_2 = object_id
-        
+
         result = self.call_service(self.detach_client, request)
-        if result is not None:
-            self.get_logger().info(f"Detached {object_id} from gripper!")
-            return True
-        self.get_logger().error(f"Failed to detach {object_id}")
-        return False
-    
+        return result is not None
+
     def call_service(self, cli, request):
-        if cli.wait_for_service(timeout_sec=5.0) is False:
-            self.get_logger().error(
-                'service not available {}'.format(cli.srv_name))
-            return None
         future = cli.call_async(request)
         self.executor.spin_until_future_complete(future, timeout_sec=5.0)
-        if future.done() is False:
-            self.get_logger().error(
-                'Future not completed {}'.format(cli.srv_name))
-            return None
-        return future.result()
+        return future.result() if future.done() else None
 
 
 def main(args=None):
@@ -205,6 +211,7 @@ def main(args=None):
     node = PickAndPlaceService()
     rclpy.spin(node)
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
