@@ -4,11 +4,12 @@
   <node pkg="krr_mirte_skills" exec="get_object_info" args="">
     <param name="use_sim_time" value="true"/>
   </node>
-<node pkg="krr_mirte_skills" exec="get_objects" args="">
+  
+  <node pkg="krr_mirte_skills" exec="get_objects" args="">
     <param name="use_sim_time" value="true"/>
   </node>
 
-<node pkg="krr_mirte_skills" exec="pick_place" args="">
+  <node pkg="krr_mirte_skills" exec="pick_place" args="">
     <param name="use_sim_time" value="true"/>
   </node>
 

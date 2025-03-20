@@ -12,6 +12,7 @@
   <test_depend>ament_pep257</test_depend>
   <test_depend>python3-pytest</test_depend>
 
+  <depend>tf_transformations</depend>
   <depend>gazebo_msgs</depend>
   <depend>boeing_gazebo_model_attachment_plugin</depend>
   <depend>krr_mirte_skills_msgs</depend>
