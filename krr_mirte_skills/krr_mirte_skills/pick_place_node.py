@@ -192,7 +192,7 @@ class PickAndPlaceService(Node):
         result = self.call_service(self.get_model_cli, GetModelList.Request())
         return result.model_names if result else None
 
-    def match_pose_with_model(self, obj_pose, model_list, threshold=0.05):
+    def match_pose_with_model(self, obj_pose, model_list, threshold=0.1):
         closest_object = None
         min_distance = float("inf")
 
