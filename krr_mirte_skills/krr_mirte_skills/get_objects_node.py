@@ -14,7 +14,7 @@
 import sys
 
 from gazebo_msgs.srv import GetModelList, GetEntityState
-from krr_mirte_skills_msgs.msg import DropLocation
+from krr_mirte_skills_msgs.msg import DropLocation, DoorwayObjects
 from krr_mirte_skills_msgs.srv import GetDropLocations, GetObjectsInRoom
 import rclpy
 from rclpy.executors import ExternalShutdownException
@@ -60,6 +60,19 @@ class GetObjectsInRoomNode(Node):
         "living_room": [(-3.15, -4.84), (-9.56, -4.79), (-9.36, 1.88), (-3.25, 1.81)],
         "office": [(-3.25, 2.04), (-9.36, 2.11), (-9.35, 7.37), (-3.24, 7.37)],
         "bedroom": [(2.76, 2.18), (-3.02, 2.05), (-2.99, 7.35), (2.76, 7.38)]
+    }
+    doorways = {
+        "kitchen_to_bedroom": [(-3.01, 1.84), (-3.01, 2.36), (-1.58, 2.36), (-1.58, 1.84)],
+        "kitchen_to_living": [(-3.46, 0.63),(-2.7, 0.63), (-2.7, -0.74), (-3.46, -0.72)],
+        "bedroom_to_office": [(-2.73, 3.47), (-3.42, 3.52), (-3.42, 4.86), (-2.73, 4.86)],
+        "office_to_living": [(-5.06, 2.61), (-5.06, 1.53), (-7.24, 1.53), (-7.24, 2.61)],
+    }
+
+    room_to_doorway = {
+        "kitchen": ["kitchen_to_bedroom", "kitchen_to_living"],
+        "living_room": ["kitchen_to_living", "office_to_living"],
+        "office": ["bedroom_to_office", "office_to_living"],
+        "bedroom": ["kitchen_to_bedroom", "bedroom_to_office"],
     }
 
     def __init__(self):
@@ -139,6 +152,14 @@ class GetObjectsInRoomNode(Node):
                 return response
 
             entities_in_room = []
+            doorway_tracker = {}
+
+            for doorway_name in self.room_to_doorway[current_room]:
+                door_obj = DoorwayObjects()
+                door_obj.which_doorway.data = doorway_name
+                doorway_tracker[doorway_name] = door_obj
+
+
             for entity_name in grabable_entities:
                 self.ent_req.name = entity_name
 
@@ -151,8 +172,13 @@ class GetObjectsInRoomNode(Node):
                 if(is_entity_in_room(obj_ent_state.state, self.rooms[current_room])):
                     entities_in_room.append(obj_ent_state.state.pose)
 
+                for doorway_name in self.room_to_doorway[current_room]:
+                    if(is_entity_in_room(obj_ent_state.state, self.doorways[doorway_name])):
+                        doorway_tracker[doorway_name].objects_in_doorway.append(obj_ent_state.state.pose)
+
             response.success = True
-            response.object_poses = entities_in_room
+            response.room_object_poses = entities_in_room
+            response.doorway_object_poses = list(doorway_tracker.values())
 
         return response
 
