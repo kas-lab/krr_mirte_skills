@@ -1,5 +1,6 @@
 # Request
 ---
 # Result
-geometry_msgs/Pose[] object_poses
+geometry_msgs/Pose[] room_object_poses
+DoorwayObjects[] doorway_object_poses
 bool success
