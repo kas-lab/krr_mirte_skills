@@ -156,7 +156,7 @@ class GetObjectsInRoomNode(Node):
 
             for doorway_name in self.room_to_doorway[current_room]:
                 door_obj = DoorwayObjects()
-                door_obj.which_doorway = doorway_name
+                door_obj.which_doorway.data = doorway_name
                 doorway_tracker[doorway_name] = door_obj
 
 
