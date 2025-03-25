@@ -185,7 +185,11 @@ class PickAndPlaceService(Node):
     def get_objects_in_room(self):
         result = self.call_service(self.get_objects_cli, GetObjectsInRoom.Request())
         if result and result.success:
-            return result.object_poses
+            objects_in_doorway_ = [doorway_object.objects_in_doorway for doorway_object in result.doorway_object_poses]
+            objects_in_doorway = []
+            for o in objects_in_doorway_:
+                objects_in_doorway += o
+            return result.room_object_poses + objects_in_doorway
         return None
 
     def get_model_list(self):
