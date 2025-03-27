@@ -184,24 +184,40 @@ class GetObjectsInRoomNode(Node):
 
     def get_drop_locations_callback(self, _, response):
 
+        self.ent_req.name = self.ROBOT_ENTITY_NAME
+        self.get_logger().info("Get entity state")
+        self.get_logger().info(str(self.ent_req))
+
+        robot_entity_state = self.send_request_async(
+            self.get_entity_cli, self.ent_req)
+        self.get_logger().info("Got robot entity")
+        self.get_logger().info(str(robot_entity_state.success))
+        
         entity_names = self.send_request_async(
             self.get_model_cli, GetModelList.Request()).model_names
         drop_entities = [
             entity_name for entity_name in entity_names if entity_name.startswith(
                 self.DROP_ENTITY_PREFIX)]
 
-        for entity_name in drop_entities:
-            self.ent_req.name = entity_name
-            obj_ent_state = self.send_request_async(
-                self.get_entity_cli, self.ent_req)
+        if(robot_entity_state.success):
+            current_room = self.which_room(robot_entity_state.state)
 
-            drop_location = DropLocation()
-            drop_location.drop_pose = obj_ent_state.state.pose
-            drop_location.type.data = entity_name.split('_')[2]
-            response.drop_locations.append(drop_location)
+            if(current_room is None):
+                return response
+            
+            for entity_name in drop_entities:
+                self.ent_req.name = entity_name
+                obj_ent_state = self.send_request_async(
+                    self.get_entity_cli, self.ent_req)
 
-        response.success = True
-        return response
+                if(is_entity_in_room(obj_ent_state.state, self.rooms[current_room])):
+                    drop_location = DropLocation()
+                    drop_location.drop_pose = obj_ent_state.state.pose
+                    drop_location.type.data = entity_name.split('_')[2]
+                    response.drop_locations.append(drop_location)
+
+            response.success = True
+            return response
 
 
 def main(args=None):
