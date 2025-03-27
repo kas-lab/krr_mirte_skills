@@ -41,7 +41,10 @@ class GetObjectInfoNode(Node):
             res.success = False
             return res
 
-        res.object_type = object_name.split('_')[2]
+        obj_name_split = object_name.split('_')
+        res.object_type = obj_name_split[2]
+        if len(obj_name_split) > 3:
+            res.attribute = obj_name_split[3]
         res.success = True
         return res
 
