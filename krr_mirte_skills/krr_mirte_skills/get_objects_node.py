@@ -112,6 +112,55 @@ class GetObjectsInRoomNode(Node):
         return next(
             (name for name, is_in_room in room_checklist if is_in_room))
 
+    def get_entities_in_room(self, model_name_prefix, room):
+        self.get_logger().info("Get models")
+        entity_names = self.send_request_async(
+            self.get_model_cli, GetModelList.Request()).model_names
+
+        self.get_logger().info("Got model list")
+        self.get_logger().info(str(entity_names))
+
+        entities_with_prefix = [
+            entity_name for entity_name in entity_names if entity_name.startswith(
+                model_name_prefix)]
+        
+        entities_in_the_room = {}
+        for entity_name in entities_with_prefix:
+            self.ent_req.name = entity_name
+            obj_ent_state = self.send_request_async(
+                self.get_entity_cli, self.ent_req)
+            
+            if(not obj_ent_state.success):
+                return {}
+
+            if(is_entity_in_room(obj_ent_state.state, room)):
+                entities_in_the_room[entity_name] = obj_ent_state.state.pose
+        return entities_in_the_room
+
+    def get_entities_in_current_room(self, model_name_prefix, include_doorways=False):
+        self.ent_req.name = self.ROBOT_ENTITY_NAME
+        robot_entity_state = self.send_request_async(
+            self.get_entity_cli, self.ent_req)
+        self.get_logger().info("Got robot entity")
+        self.get_logger().info(str(robot_entity_state.success))
+
+        entities_in_the_room = {}
+        entities_in_the_doorways = {}
+        if(robot_entity_state.success):
+            current_room = self.which_room(robot_entity_state.state)
+
+            if(current_room is None):
+                return {}
+
+            entities_in_the_room = self.get_entities_in_room(model_name_prefix, self.rooms[current_room])
+
+            if include_doorways is True:
+                for doorway_name in self.room_to_doorway[current_room]:
+                    entities_in_the_doorways[doorway_name] = self.get_entities_in_room(
+                        model_name_prefix, self.doorways[doorway_name])
+        return entities_in_the_room, entities_in_the_doorways
+            
+    
     def send_request_async(self, client, request):
         while not client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
@@ -123,101 +172,28 @@ class GetObjectsInRoomNode(Node):
         return future.result()
 
     def get_objects_callback(self, _, response):
-        response.success = False
-        self.get_logger().info("Get models")
 
-        entity_names = self.send_request_async(
-            self.get_model_cli, GetModelList.Request()).model_names
-
-        self.get_logger().info("Got model list")
-        self.get_logger().info(str(entity_names))
-
-        grabable_entities = [
-            entity_name for entity_name in entity_names if entity_name.startswith(
-                self.GRABABLE_ENTITY_PREFIX)]
-
-        self.ent_req.name = self.ROBOT_ENTITY_NAME
-        self.get_logger().info("Get entity state")
-        self.get_logger().info(str(self.ent_req))
-
-        robot_entity_state = self.send_request_async(
-            self.get_entity_cli, self.ent_req)
-        self.get_logger().info("Got robot entity")
-        self.get_logger().info(str(robot_entity_state.success))
-
-        if(robot_entity_state.success):
-            current_room = self.which_room(robot_entity_state.state)
-
-            if(current_room is None):
-                return response
-
-            entities_in_room = []
-            doorway_tracker = {}
-
-            for doorway_name in self.room_to_doorway[current_room]:
-                door_obj = DoorwayObjects()
-                door_obj.which_doorway.data = doorway_name
-                doorway_tracker[doorway_name] = door_obj
-
-
-            for entity_name in grabable_entities:
-                self.ent_req.name = entity_name
-
-                obj_ent_state = self.send_request_async(
-                    self.get_entity_cli, self.ent_req)
-
-                if(not obj_ent_state.success):
-                    return response
-
-                if(is_entity_in_room(obj_ent_state.state, self.rooms[current_room])):
-                    entities_in_room.append(obj_ent_state.state.pose)
-
-                for doorway_name in self.room_to_doorway[current_room]:
-                    if(is_entity_in_room(obj_ent_state.state, self.doorways[doorway_name])):
-                        doorway_tracker[doorway_name].objects_in_doorway.append(obj_ent_state.state.pose)
-
-            response.success = True
-            response.room_object_poses = entities_in_room
-            response.doorway_object_poses = list(doorway_tracker.values())
-
+        entities_in_room, entities_in_doorway = self.get_entities_in_current_room(
+            self.GRABABLE_ENTITY_PREFIX, include_doorways=True)
+        response.room_object_poses = list(entities_in_room.values())
+        for doorway_name, objects in entities_in_doorway.items():
+            door_obj = DoorwayObjects()
+            door_obj.which_doorway.data = doorway_name
+            print(list(objects.values()))
+            door_obj.objects_in_doorway = list(objects.values())
+            response.doorway_object_poses.append(door_obj)
+        response.success = True
         return response
 
     def get_drop_locations_callback(self, _, response):
-
-        self.ent_req.name = self.ROBOT_ENTITY_NAME
-        self.get_logger().info("Get entity state")
-        self.get_logger().info(str(self.ent_req))
-
-        robot_entity_state = self.send_request_async(
-            self.get_entity_cli, self.ent_req)
-        self.get_logger().info("Got robot entity")
-        self.get_logger().info(str(robot_entity_state.success))
-        
-        entity_names = self.send_request_async(
-            self.get_model_cli, GetModelList.Request()).model_names
-        drop_entities = [
-            entity_name for entity_name in entity_names if entity_name.startswith(
-                self.DROP_ENTITY_PREFIX)]
-
-        if(robot_entity_state.success):
-            current_room = self.which_room(robot_entity_state.state)
-
-            if(current_room is None):
-                return response
-            
-            for entity_name in drop_entities:
-                self.ent_req.name = entity_name
-                obj_ent_state = self.send_request_async(
-                    self.get_entity_cli, self.ent_req)
-
-                if(is_entity_in_room(obj_ent_state.state, self.rooms[current_room])):
-                    drop_location = DropLocation()
-                    drop_location.drop_pose = obj_ent_state.state.pose
-                    drop_location.type.data = entity_name.split('_')[2]
-                    response.drop_locations.append(drop_location)
-
-            response.success = True
-            return response
+        drop_locations_in_room, _ = self.get_entities_in_current_room(self.DROP_ENTITY_PREFIX)
+        for name, pose in drop_locations_in_room.items():
+            drop_location = DropLocation()
+            drop_location.drop_pose = pose
+            drop_location.type.data = name.split('_')[2]
+            response.drop_locations.append(drop_location)
+        response.success = True
+        return response
 
 
 def main(args=None):
