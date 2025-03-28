@@ -1,5 +1,6 @@
 # Request
 ---
 # Result
-string object_type
+string object_type  # e.g., spoon, can, hat etc.
+string attribute  # e.g., clean, dirty, empty etc.
 bool success
