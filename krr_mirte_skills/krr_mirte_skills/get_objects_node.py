@@ -51,6 +51,7 @@ def is_entity_in_room(entity_state, corners):
 
 
 class GetObjectsInRoomNode(Node):
+    self.ci_logger + rclpy.logging.get_logger("ci_logger")
 
     DROP_ENTITY_PREFIX = "drop_"
     GRABABLE_ENTITY_PREFIX = "obj_"
@@ -172,6 +173,11 @@ class GetObjectsInRoomNode(Node):
         return future.result()
 
     def get_objects_callback(self, _, response):
+        self.ci_logger.info("""
+{
+  action: "get_objects_in_room"
+}
+""")
 
         entities_in_room, entities_in_doorway = self.get_entities_in_current_room(
             self.GRABABLE_ENTITY_PREFIX, include_doorways=True)
@@ -186,6 +192,11 @@ class GetObjectsInRoomNode(Node):
         return response
 
     def get_drop_locations_callback(self, _, response):
+        self.ci_logger.info("""
+{
+  action: "get_drop_locations"
+}
+""")
         drop_locations_in_room, _ = self.get_entities_in_current_room(self.DROP_ENTITY_PREFIX)
         for name, pose in drop_locations_in_room.items():
             drop_location = DropLocation()

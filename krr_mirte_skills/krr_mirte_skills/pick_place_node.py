@@ -25,6 +25,7 @@ from tf_transformations import euler_from_quaternion
 class PickAndPlaceService(Node):
     def __init__(self):
         super().__init__("pick_service")
+        self.ci_logger = rclpy.logging.get_logger("ci_logger")
 
         self.cb_group_srv = MutuallyExclusiveCallbackGroup()
         self.cb_group_cli = MutuallyExclusiveCallbackGroup()
@@ -69,6 +70,12 @@ class PickAndPlaceService(Node):
 
     def pick_callback(self, request, response):
         object_id = getattr(request, "object_id", "").strip()
+        self.ci_logger.info("""
+{
+  action: "pick_object"
+  object_id: {0}
+}
+""".format(object_id))
 
         if self.attached_object is not None:
             response.success = False
@@ -230,6 +237,11 @@ class PickAndPlaceService(Node):
         return ((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2) ** 0.5
 
     def place_callback(self, request, response):
+        self.ci_logger.info("""
+{
+  action: "place_object"
+}
+""")
         if self.attached_object is None:
             response.success = False
             response.error = "No object to place"

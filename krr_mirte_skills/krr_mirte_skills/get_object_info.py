@@ -21,6 +21,7 @@ from gazebo_msgs.srv import GetModelProperties
 class GetObjectInfoNode(Node):
     def __init__(self):
         super().__init__('get_object_info_service')
+        self.ci_logger = rclpy.logging.get_logger("ci_logger")
         self.srv = self.create_service(
             GetObjectInfo,
             'get_object_info',
@@ -31,6 +32,11 @@ class GetObjectInfoNode(Node):
             callback_group=rclpy.callback_groups.MutuallyExclusiveCallbackGroup())
 
     def get_object_info_cb(self, req, res):
+        self.ci_logger.info("""
+{
+  action: "get_object_info"
+}
+""")
         model_req = GetModelProperties.Request()
         model_req.model_name = "mirte"
         response = self.call_service(self.cli_get, model_req)
