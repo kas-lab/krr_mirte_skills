@@ -70,12 +70,10 @@ class PickAndPlaceService(Node):
 
     def pick_callback(self, request, response):
         object_id = getattr(request, "object_id", "").strip()
-        self.ci_logger.info("""
-{
+        self.ci_logger.info("""{{
   action: "pick_object"
   object_id: {0}
-}
-""".format(object_id))
+}}""".format(object_id))
 
         if self.attached_object is not None:
             response.success = False

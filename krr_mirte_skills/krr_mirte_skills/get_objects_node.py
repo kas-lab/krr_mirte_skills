@@ -51,7 +51,6 @@ def is_entity_in_room(entity_state, corners):
 
 
 class GetObjectsInRoomNode(Node):
-    self.ci_logger + rclpy.logging.get_logger("ci_logger")
 
     DROP_ENTITY_PREFIX = "drop_"
     GRABABLE_ENTITY_PREFIX = "obj_"
@@ -78,6 +77,7 @@ class GetObjectsInRoomNode(Node):
 
     def __init__(self):
         super().__init__('get_objects_in_room_node')
+        self.ci_logger = rclpy.logging.get_logger("ci_logger")
         self.srv = self.create_service(
             GetObjectsInRoom,
             'get_objects_in_room',
