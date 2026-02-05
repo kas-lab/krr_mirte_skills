@@ -77,6 +77,7 @@ class GetObjectsInRoomNode(Node):
 
     def __init__(self):
         super().__init__('get_objects_in_room_node')
+        self.ci_logger = rclpy.logging.get_logger("ci_logger")
         self.srv = self.create_service(
             GetObjectsInRoom,
             'get_objects_in_room',
@@ -172,6 +173,11 @@ class GetObjectsInRoomNode(Node):
         return future.result()
 
     def get_objects_callback(self, _, response):
+        self.ci_logger.info("""
+{
+  action: "get_objects_in_room"
+}
+""")
 
         entities_in_room, entities_in_doorway = self.get_entities_in_current_room(
             self.GRABABLE_ENTITY_PREFIX, include_doorways=True)
@@ -186,6 +192,11 @@ class GetObjectsInRoomNode(Node):
         return response
 
     def get_drop_locations_callback(self, _, response):
+        self.ci_logger.info("""
+{
+  action: "get_drop_locations"
+}
+""")
         drop_locations_in_room, _ = self.get_entities_in_current_room(self.DROP_ENTITY_PREFIX)
         for name, pose in drop_locations_in_room.items():
             drop_location = DropLocation()
