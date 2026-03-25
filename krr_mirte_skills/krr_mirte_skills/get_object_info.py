@@ -46,6 +46,7 @@ class GetObjectInfoNode(Node):
         if len(obj_name_split) > 3:
             res.attribute = obj_name_split[3]
         res.success = True
+        rclpy.logging.get_logger("ci_logger").info('{{action: "get_object_info", object_id: "{}"}}'.format(object_name))
         return res
 
     def call_service(self, cli, request):

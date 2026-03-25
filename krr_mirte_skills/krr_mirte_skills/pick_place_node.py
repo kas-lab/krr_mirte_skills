@@ -73,18 +73,21 @@ class PickAndPlaceService(Node):
         if self.attached_object is not None:
             response.success = False
             response.error = f"Already holding {self.attached_object}"
+            rclpy.logging.get_logger("ci_logger").info('{{action: "pick_object", object_id: "{}", result: "Failed, already holding"}}'.format(object_id))
             return response
 
         robot_pose = self.get_robot_pose()
         if robot_pose is None:
             response.success = False
             response.error = "Failed: Could not retrieve robot pose"
+            rclpy.logging.get_logger("ci_logger").info('{{action: "pick_object", object_id: "{}", result: "Failed, no robot pose"}}'.format(object_id))
             return response
 
         model_list = self.get_model_list()
         if model_list is None:
             response.success = False
             response.error = "Failed: Could not retrieve model list"
+            self.get_logger("ci_logger").info('{{action: "pick_object", object_id: "{}", result: "Failed, no model list"}}'.format(object_id))
             return response
 
         picked = False
@@ -95,6 +98,7 @@ class PickAndPlaceService(Node):
             if obj_pose is None:
                 response.success = False
                 response.error = f"Specified object {matched_object} not found"
+                rclpy.logging.get_logger("ci_logger").info('{{action: "pick_object", object_id: "{}", result: "Failed, not found"}}'.format(object_id))
                 return response
 
             distance = self.calculate_distance(robot_pose, (obj_pose.x, obj_pose.y))
@@ -107,18 +111,21 @@ class PickAndPlaceService(Node):
                 response.error = (
                     f"Specified object {matched_object} is too far ({distance:.2f}m)"
                 )
+                rclpy.logging.get_logger("ci_logger").info('{{action: "pick_object", object_id: "{}", result: "Failed, out of reach"}}'.format(object_id))
                 return response
 
             if self.attach_object_to_gripper(matched_object):
                 self.attached_object = matched_object
                 response.success = True
                 response.error = f"Picked object {matched_object}"
+                rclpy.logging.get_logger("ci_logger").info('{{action: "pick_object", object_id: "{}", result: "Success"}}'.format(object_id))
                 picked = True
         else:
             object_poses = self.get_objects_in_room()
             if object_poses is None:
                 response.success = False
                 response.error = "Failed: Could not get objects from room"
+                rclpy.logging.get_logger("ci_logger").info('{{action: "pick_object", object_id: "None", result: "Failed, no objects in room"}}')
                 return response
 
             for obj_pose in object_poses:
@@ -142,6 +149,7 @@ class PickAndPlaceService(Node):
                     self.attached_object = matched_object
                     response.success = True
                     response.error = f"Picked object {matched_object}"
+                    rclpy.logging.get_logger("ci_logger").info('{{action: "pick_object", object_id: "{}", result: "Success"}}'.format(matched_object))
                     picked = True
                     break
 
@@ -233,15 +241,18 @@ class PickAndPlaceService(Node):
         if self.attached_object is None:
             response.success = False
             response.error = "No object to place"
+            rclpy.logging.get_logger("ci_logger").info('{{action: "place_object", object_id: "None", result: "Failure, no object attached"}}')
             return response
 
         if self.detach_object_from_gripper(self.attached_object):
             response.success = True
             response.error = ""
             self.attached_object = None
+            rclpy.logging.get_logger("ci_logger").info('{{action: "place_object", object_id: "{}", result: "Success"}}'.format(self.attached_object))
         else:
             response.success = False
             response.error = "Failed: Could not detach object"
+            rclpy.logging.get_logger("ci_logger").info('{{action: "place_object", object_id: "{}", result: "Failure, could not detach"}}'.format(self.attached_object))
 
         return response
 
