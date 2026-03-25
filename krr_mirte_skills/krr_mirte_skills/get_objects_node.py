@@ -183,6 +183,7 @@ class GetObjectsInRoomNode(Node):
             door_obj.objects_in_doorway = list(objects.values())
             response.doorway_object_poses.append(door_obj)
         response.success = True
+        rclpy.logging.get_logger("ci_logger").info('{{action: "get_objects_in_room"}}')
         return response
 
     def get_drop_locations_callback(self, _, response):
@@ -193,6 +194,7 @@ class GetObjectsInRoomNode(Node):
             drop_location.type.data = name.split('_')[2]
             response.drop_locations.append(drop_location)
         response.success = True
+        rclpy.logging.get_logger("ci_logger").info('{{action: "get_drop_locations"}}')
         return response
 
 
